@@ -50,15 +50,18 @@ Step 6: Done : Now continue to importing the project. [Don't share the above pas
 ---
 ### How to Access:
 - Check Running The Site At  [http://localhost:8000/shop/](http://localhost:8000/shop/)
+- Default Username And Password For Admin Is "admin@gmail.com" And "admin"
+- The default Username And Password For User Is "guest@gmail.com" And "guest"
 
 ---
 #### Some Screenshots for the project:
 - Home Page
-![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/6161fb90-ac83-445d-9fb2-56681f6a52b4)
+![image](images/home.png)
 - Login Page
-![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/c5451416-a669-4d76-ad84-9b8ea26bf6b4)
+![image](images/login.png)
 - Register Page
-![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/19f06ec9-70aa-4700-8846-a2e6514d88c2)
+![image](images/register.png)
+
 - Category Wise Product Filter
 ![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/757e552c-1526-4142-869b-ffbf27a232e0)
 - Cart Items
