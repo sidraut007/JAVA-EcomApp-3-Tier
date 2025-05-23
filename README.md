@@ -4,21 +4,21 @@
 #### Some Screenshots for the project:
 <table>
   <tr>
-    <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
-    <td align="center">Register Page<br><img src="images/register.png" alt="Register Page" width="300"/></td>
+    <td align="center">Home Page<br><img src="images/home.png" alt="Home Page" width="300"/></td>
+    <td align="center">Admin Home<br><img src="images/admin-home.png" alt="Admin Home" width="300"/></td>
   </tr>
 </table>
 
 ---
 <table>
   <tr>
-    <td align="center">Home Page<br><img src="images/home.png" alt="Home Page" width="300"/></td>
-    <td align="center">Admin Home<br><img src="images/admin-home.png" alt="Admin Home" width="300"/></td>
+    <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
+    <td align="center">Register Page<br><img src="images/register.png" alt="Register Page" width="300"/></td>
   </tr>
 </table>
 
-
 ---
+
 ### The users will get a mail to their registered mail Id during:-
 - New User Registration
 - Order Successfully Placed
