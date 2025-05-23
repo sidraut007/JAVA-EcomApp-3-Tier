@@ -76,7 +76,7 @@ Step 6: Done : Now continue to importing the project. [Don't share the above pas
 ---
 
 - Admin Home
-![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/0e909800-b9a2-4ece-884c-24cdc8ca931a)
+![image](images/admin-home.png)
 - Stock Items
 ![image](https://github.com/shashirajraja/shopping-cart/assets/34605595/e94e519b-e65c-4f51-8b37-e1b555208f2d)
 - Shipped Items
