@@ -53,10 +53,18 @@
 
 ---
 #### Some Screenshots for the project:
-- Login Page
-![image](images/login.png)
-- Register Page
-![image](images/register.png)
+
+<div style="display: flex; gap: 10px;">
+  <div>
+    <p>Login Page</p>
+    <img src="images/login.png" alt="Login Page" width="300"/>
+  </div>
+  <div>
+    <p>Register Page</p>
+    <img src="images/register.png" alt="Register Page" width="300"/>
+  </div>
+</div>
+
 
 ---
 <img width="404" alt="image" src="https://github.com/shashirajraja/shopping-cart/assets/34605595/cb60c616-c32c-42eb-abe5-494d8574c09a">
