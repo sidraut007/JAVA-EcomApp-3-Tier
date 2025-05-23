@@ -1,10 +1,22 @@
 # Online Shopping Cart (E-Commerce Website)
 - The Online Shopping Cart is a full-featured e-commerce web application designed to provide a seamless shopping experience for users while enabling 	businesses to showcase and sell their products online.
+---
+#### Some Screenshots for the project:
+<table>
+  <tr>
+    <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
+    <td align="center">Register Page<br><img src="images/register.png" alt="Register Page" width="300"/></td>
+  </tr>
+</table>
 
-- Home Page
-![image](images/home.png)
-- Admin Home
-![image](images/admin-home.png)
+---
+<table>
+  <tr>
+    <td align="center">Home Page<br><img src="images/home.png" alt="Home Page" width="300"/></td>
+    <td align="center">Admin Home<br><img src="images/admin-home.png" alt="Admin Home" width="300"/></td>
+  </tr>
+</table>
+
 
 ---
 ### The users will get a mail to their registered mail Id during:-
@@ -52,19 +64,7 @@
 - The default Username And Password For User Is "guest@gmail.com" And "guest"
 
 ---
-#### Some Screenshots for the project:
 
-#### Some Screenshots for the project:
-
-<table>
-  <tr>
-    <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
-    <td align="center">Register Page<br><img src="images/register.png" alt="Register Page" width="300"/></td>
-  </tr>
-</table>
-
-
----
 <img width="404" alt="image" src="https://github.com/shashirajraja/shopping-cart/assets/34605595/cb60c616-c32c-42eb-abe5-494d8574c09a">
 
 - Class Diagram
