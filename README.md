@@ -54,16 +54,14 @@
 ---
 #### Some Screenshots for the project:
 
-<div style="display: flex; gap: 10px;">
-  <div>
-    <p>Login Page</p>
-    <img src="images/login.png" alt="Login Page" width="300"/>
-  </div>
-  <div>
-    <p>Register Page</p>
-    <img src="images/register.png" alt="Register Page" width="300"/>
-  </div>
-</div>
+#### Some Screenshots for the project:
+
+<table>
+  <tr>
+    <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
+    <td align="center">Register Page<br><img src="images/register.png" alt="Register Page" width="300"/></td>
+  </tr>
+</table>
 
 
 ---
