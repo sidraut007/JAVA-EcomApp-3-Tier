@@ -9,7 +9,6 @@
   </tr>
 </table>
 
----
 <table>
   <tr>
     <td align="center">Login Page<br><img src="images/login.png" alt="Login Page" width="300"/></td>
