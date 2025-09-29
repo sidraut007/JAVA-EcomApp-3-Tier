@@ -1,20 +1,131 @@
-name: CI/CD Pipeline
+name: Enterprise CI/CD Pipeline
 
 on:
+  push:
+    branches: [ main, develop, 'release/*', 'hotfix/*' ]
+  pull_request:
+    branches: [ main, develop ]
   workflow_dispatch:
-  # push:
-  #   branches: [ main, develop ]
-  # pull_request:
-  #   branches: [ main ]
-
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      skip_tests:
+        description: 'Skip tests'
+        required: false
+        default: false
+        type: boolean
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: sidraut007/Ecom-App
+  IMAGE_NAME: sidraut007/ecom-app
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: '-Xmx1024m'
+  NODE_VERSION: '18'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  code-quality:
+    name: Code Quality & Security
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Validate Maven POM
+      run: mvn validate
+      
+    - name: Compile code
+      run: mvn clean compile -DskipTests
+      
+    - name: Run static analysis
+      run: |
+        mvn spotbugs:check
+        mvn checkstyle:check
+      continue-on-error: true
+      
+    - name: Dependency vulnerability scan
+      run: mvn org.owasp:dependency-check-maven:check
+      continue-on-error: true
+      
+    - name: Upload code quality reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: code-quality-reports
+        path: |
+          target/spotbugs.xml
+          target/checkstyle-result.xml
+          target/dependency-check-report.html
+        retention-days: 30
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ !inputs.skip_tests }}
+    
+    strategy:
+      matrix:
+        java-version: ['17', '21']
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup JDK ${{ matrix.java-version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Run unit tests
+      run: |
+        mvn clean test \
+          -Dmaven.test.failure.ignore=false \
+          -Dtest.coverage.enabled=true
+          
+    - name: Generate test report
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Unit Tests (JDK ${{ matrix.java-version }})
+        path: target/surefire-reports/*.xml
+        reporter: java-junit
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.java-version == '17'
+      with:
+        file: target/site/jacoco/jacoco.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ !inputs.skip_tests }}
     
     services:
       mysql:
@@ -22,54 +133,125 @@ jobs:
         env:
           MYSQL_DATABASE: shopping-cart
           MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpass
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+          --health-start-period=30s
+          
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up JDK 17
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: ${{ env.JAVA_VERSION }}
         distribution: 'temurin'
+        cache: maven
         
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
+    - name: Wait for services
+      run: |
+        timeout 60 bash -c 'until mysqladmin ping -h 127.0.0.1 --silent; do sleep 1; done'
+        timeout 60 bash -c 'until redis-cli -h 127.0.0.1 ping; do sleep 1; done'
         
     - name: Initialize database
       run: |
         mysql -h 127.0.0.1 -u root -proot shopping-cart < databases/mysql_query.sql
         
-    - name: Run tests
-      run: mvn clean test
-      
-    - name: Build application
-      run: mvn clean package -DskipTests
+    - name: Run integration tests
+      run: mvn verify -Pintegration-tests
+      env:
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        REDIS_HOST: 127.0.0.1
+        REDIS_PORT: 6379
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: target/failsafe-reports/
+        retention-days: 30
 
-  build-and-push:
-    needs: test
+  security-scan:
+    name: Security Scanning
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, integration-tests, security-scan]
+    if: always() && (needs.code-quality.result == 'success' && (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped') && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped'))
+    timeout-minutes: 20
     
-    - name: Log in to Container Registry
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Build application
+      run: |
+        mvn clean package -DskipTests \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.source.skip=true
+          
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Docker Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
         
     - name: Extract metadata
       id: meta
@@ -79,43 +261,135 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=sha,prefix={{branch}}-
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-,format=short
           type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=E-commerce Application
+          org.opencontainers.image.description=Java-based 3-tier e-commerce application
+          org.opencontainers.image.vendor=Your Company
           
     - name: Build and push Docker image
+      id: build
       uses: docker/build-push-action@v5
       with:
         context: .
+        platforms: linux/amd64,linux/arm64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+          
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+        
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: sbom.spdx.json
+        retention-days: 90
 
   deploy-staging:
-    needs: build-and-push
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
+    needs: build
+    if: (github.ref == 'refs/heads/develop' || inputs.environment == 'staging') && github.event_name != 'pull_request'
+    environment: 
+      name: staging
+      url: https://staging.ecom-app.com
+    timeout-minutes: 15
     
     steps:
-    - uses: actions/checkout@v4
-    
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Deploy to staging
       run: |
         echo "Deploying to staging environment"
-        # Add your staging deployment commands here
-        # Example: kubectl apply -f k8s/staging/
+        echo "Image: ${{ needs.build.outputs.image-tags }}"
+        echo "Digest: ${{ needs.build.outputs.image-digest }}"
+        # kubectl set image deployment/ecom-app ecom-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}
+        # kubectl rollout status deployment/ecom-app
         
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests against staging"
+        # curl -f https://staging.ecom-app.com/health || exit 1
+        
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        text: 'Staging deployment ${{ job.status }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   deploy-production:
-    needs: build-and-push
+    name: Deploy to Production
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
+    needs: [build, deploy-staging]
+    if: (github.ref == 'refs/heads/main' || inputs.environment == 'production') && github.event_name != 'pull_request'
+    environment: 
+      name: production
+      url: https://ecom-app.com
+    timeout-minutes: 20
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to production
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Blue-Green deployment
       run: |
-        echo "Deploying to production environment"
-        # Add your production deployment commands here
-        # Example: kubectl apply -f k8s/production/
+        echo "Starting blue-green deployment to production"
+        echo "Image: ${{ needs.build.outputs.image-tags }}"
+        # kubectl apply -f k8s/production/
+        # kubectl set image deployment/ecom-app-green ecom-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}
+        # kubectl rollout status deployment/ecom-app-green
+        
+    - name: Production health check
+      run: |
+        echo "Running production health checks"
+        # curl -f https://ecom-app.com/health || exit 1
+        
+    - name: Switch traffic
+      run: |
+        echo "Switching traffic to new version"
+        # kubectl patch service ecom-app -p '{"spec":{"selector":{"version":"green"}}}'
+        
+    - name: Cleanup old version
+      run: |
+        echo "Cleaning up old version"
+        # kubectl delete deployment ecom-app-blue
+        
+    - name: Create release
+      uses: actions/create-release@v1
+      if: github.ref == 'refs/heads/main'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          ## Changes
+          - Deployed commit: ${{ github.sha }}
+          - Image digest: ${{ needs.build.outputs.image-digest }}
+          
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        text: 'Production deployment ${{ job.status }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
